@@ -1,5 +1,10 @@
 package ru.betry;
 
+import ru.betry.urfuSchedule.UrfuScheduleService;
+
+import java.io.IOException;
+import java.util.Date;
+
 enum BotType {
     Telegram,
     YandexAlice
@@ -8,34 +13,39 @@ enum BotType {
 enum CoreMessageType {
     help,
     unknown,
-    simple,
+    notCommandMessage,
     notSupportedType,
-    restart
+    restart,
+    changeGroup,
+    getSchedule,
+    getWeekSchedule,
+    getTomorrowSchedule,
+    getFreeRooms
 }
 
 public class ParserToBotCore {
 
-    private BotCore core;
+    private final BotCore core;
 
     public ParserToBotCore(){
         core = new BotCore();
     }
 
-    public String[] getAnswerForUser(String userId, String userMessage, BotType type) {
-        CoreMessageType messageType = parseMessageType(userMessage, type);
+    public String[] getAnswerForUser(ChatInfoClass chatInfo) {
+        CoreMessageType messageType = parseMessageType(chatInfo.getUserMessage(), chatInfo.getBotType());
 
-        switch (messageType) {
-            case help:
-                return core.getHelp();
-            case unknown:
-                return core.getUnknownCommand();
-            case simple:
-                return core.getSimpleMessage(userId, userMessage);
-            case restart:
-                return core.getRestart();
-            default:
-                return core.getNotSupportedType();
-        }
+        return switch (messageType) {
+            case help -> core.getHelp();
+            case unknown -> core.getUnknownCommand();
+            case notCommandMessage -> core.getNotCommandMessage(chatInfo);
+            case restart -> core.getRestart(chatInfo);
+            case changeGroup -> core.getChangeGroup(chatInfo);
+            case getSchedule -> core.getTodaySchedule(chatInfo);
+            case getTomorrowSchedule -> core.getTomorrowSchedule(chatInfo);
+            case getWeekSchedule -> core.getWeekSchedule(chatInfo);
+            case getFreeRooms -> core.getFreeRooms(chatInfo, new Date());
+            default -> core.getNotSupportedType();
+        };
     }
 
     private CoreMessageType parseMessageType(String userMessage, BotType type) {
@@ -44,21 +54,31 @@ public class ParserToBotCore {
                 if (userMessage.startsWith("/"))
                     return getTelegramCommand(userMessage);
                 else
-                    return CoreMessageType.simple;
+                    return getTextCommand(userMessage);
             }
             default:
                 return CoreMessageType.notSupportedType;
         }
     }
 
+    private CoreMessageType getTextCommand(String userMessage) {
+        //не забудь обновить и getAnswerForUser
+        return switch (userMessage) {
+            case ("Расписание") -> CoreMessageType.getSchedule;
+            case ("Расписание на завтра") -> CoreMessageType.getTomorrowSchedule;
+            case ("Расписание на неделю") -> CoreMessageType.getWeekSchedule;
+            case ("Свободные кабинеты") -> CoreMessageType.getFreeRooms;
+            default -> CoreMessageType.notCommandMessage;
+        };
+    }
+
     private CoreMessageType getTelegramCommand(String userCommand){
-        switch (userCommand) {
-            case ("/help"):
-                return CoreMessageType.help;
-            case ("/restart"):
-                return CoreMessageType.restart;
-            default:
-                return CoreMessageType.unknown;
-        }
+        //не забудь обновить и getAnswerForUser
+        return switch (userCommand) {
+            case ("/start"), ("/help") -> CoreMessageType.help;
+            case ("/restart") -> CoreMessageType.restart;
+            case ("/change_group") -> CoreMessageType.changeGroup;
+            default -> CoreMessageType.unknown;
+        };
     }
 }
